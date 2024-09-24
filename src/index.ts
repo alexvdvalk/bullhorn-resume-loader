@@ -1,5 +1,6 @@
+#! /usr/bin/env node
+
 import { Command } from 'commander';
-import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import path from 'path';
 import { AxiosInstance } from 'axios';
@@ -7,15 +8,14 @@ import FormData from 'form-data';
 import { login } from './bullhorn_auth';
 import { createObjectCsvWriter, createArrayCsvWriter } from 'csv-writer';
 import { ParsedCandidate, CandidateEducation, CandidateWorkHistory } from './interfaces';
+import figlet from "figlet";
 
-dotenv.config();
 
+// import Bottleneck from "bottleneck";
 
-import Bottleneck from "bottleneck";
-
-const limiter = new Bottleneck({
-    maxConcurrent: 5,
-});
+// const limiter = new Bottleneck({
+//     maxConcurrent: 5,
+// });
 const program = new Command();
 
 // ANSI escape code for pink color
@@ -26,19 +26,18 @@ const reset = '\x1b[0m';
 const pinkLog = (...args: any[]) => {
     console.log(pink, ...args, reset);
 };
+console.log(figlet.textSync("Resume Loader"));
 
 // Allowed file extensions
 const allowedExtensions = ['.txt', '.doc', '.docx', '.pdf'];
 
-
 program
-    .name('bullhorn-resume-processor')
-    .description('Process resumes and create candidate records in Bullhorn')
+    .name('bullhorn-resume-loader')
+    .description('Load resumes and create candidate records in Bullhorn')
     .version('1.0.0');
 
-
-program.command('parse-and-upload')
-    .description('This command uses the Bullhorn API to parse resumes into JSON format. These files can then be loaded into Bullhorn using the load-from-json command')
+program.command('load')
+    .description('Parse and create candidates for all the resumes in a folder')
     .requiredOption('-u, --username <username>', 'Bullhorn API username')
     .requiredOption('-p, --password <password>', 'Bullhorn API password')
     .requiredOption('-r, --resumeFolder <resumeFolder>', 'Folder containing resumes')
