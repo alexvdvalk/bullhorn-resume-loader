@@ -33,7 +33,9 @@ const allowedExtensions = ['.txt', '.doc', '.docx', '.pdf'];
 
 program
     .name('bullhorn-resume-loader')
-    .description('Load resumes and create candidate records in Bullhorn')
+    .description(`Load resumes and create candidate records in Bullhorn
+Author: Alex van der Valk
+LinkedIn: https://www.linkedin.com/in/alexvdvalk/`)
     .version('1.0.0');
 
 program.command('load')
