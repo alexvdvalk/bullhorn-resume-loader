@@ -28,7 +28,7 @@ The tool supports the following resume file types:
 
 ### Example
 
-npx bullhorn-resume-loader load -u myUsername -p myPassword -r ./resumes
+`npx bullhorn-resume-loader load -u myUsername -p myPassword -r ./resumes`
 
 ### Output
 
