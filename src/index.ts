@@ -3,11 +3,11 @@
 import { Command } from 'commander';
 import fs from 'fs/promises';
 import path from 'path';
-import { AxiosInstance } from 'axios';
+import { type AxiosInstance } from 'axios';
 import FormData from 'form-data';
 import { login } from './bullhorn_auth';
 import { createObjectCsvWriter, createArrayCsvWriter } from 'csv-writer';
-import { ParsedCandidate, CandidateEducation, CandidateWorkHistory } from './interfaces';
+import type { ParsedCandidate, CandidateEducation, CandidateWorkHistory } from './interfaces';
 import figlet from "figlet";
 
 
@@ -138,7 +138,7 @@ program.command('load')
 
 const loadCandidateToBullhorn = async (candidate: ParsedCandidate, resumeData: Buffer, fileName: string, api: AxiosInstance) => {
 
-    let cleanedPayload = { ...candidate.candidate as { [key: string]: any } }
+    const cleanedPayload = { ...candidate.candidate as { [key: string]: any } }
     delete cleanedPayload.editHistoryValue;
     delete cleanedPayload.onboardingReceivedSent;
     cleanedPayload.skillSet = candidate.skillList
@@ -181,7 +181,7 @@ const addWorkHistories = async (id: string, workHistory: CandidateWorkHistory[],
 }
 
 const addEducationHistories = async (id: string, educationHistory: CandidateEducation[], api: AxiosInstance) => {
-    for await (let ed of educationHistory) {
+    for await (const ed of educationHistory) {
         try {
             const { data } = await api.put('/entity/CandidateEducation', {
                 candidate: {

@@ -37,12 +37,12 @@ export interface Candidate {
     editHistoryValue: string;
 }
 
-interface OnboardingReceivedSent {
+export interface OnboardingReceivedSent {
     onboardingDocumentReceivedCount: null;
     onboardingDocumentSentCount: null;
 }
 
-interface Address {
+export interface Address {
     address1: null;
     address2: null;
     city: string;
@@ -54,4 +54,55 @@ interface Address {
     timezone: null;
     latitude: null;
     longitude: null;
+}
+
+export interface LoginResponse {
+    identity: Identity;
+    sessions: Session[];
+    apps: App[];
+    requestUrl: string;
+    redirectUrl: string;
+}
+
+export interface App {
+    enabled: boolean;
+}
+
+export interface Session {
+    name: string;
+    value: Value;
+}
+
+export interface Value {
+    token?: string;
+    endpoint: string;
+}
+
+export interface Identity {
+    username: string;
+    masterUserId: number;
+    userId: number;
+    corporationId: number;
+    privateLabelId: number;
+    userTypeId: number;
+    userPrimaryDepartmentId: number;
+    swimLaneId: number;
+    dataCenterId: number;
+    name: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    locale: string;
+    corporationName: string;
+    allPrivateLabelIds: number[];
+    isPasswordCaseSensitive: boolean;
+    eStaffAgencyId: string;
+    userTypeName: string;
+    departmentName: string;
+}
+
+export interface TokenResponse {
+    BhRestToken: string;
+    restUrl: string;
+    time?: string
 }
