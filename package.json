@@ -1,6 +1,6 @@
 {
   "name": "bullhorn-resume-loader",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Process resumes and create candidate records in Bullhorn",
   "main": "dist/index.js",
   "scripts": {
