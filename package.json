@@ -3,6 +3,7 @@
   "version": "0.0.3",
   "description": "Process resumes and create candidate records in Bullhorn",
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "build": "bun build --target node --outdir  ./dist ./src/index.ts",
     "start": "node dist/index.js",
