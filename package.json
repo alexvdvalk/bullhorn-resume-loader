@@ -4,6 +4,10 @@
   "description": "Process resumes and create candidate records in Bullhorn",
   "main": "dist/index.js",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexvdvalk/bullhorn-resume-loader"
+  },
   "scripts": {
     "build": "bun build --target node --outdir  ./dist ./src/index.ts",
     "start": "node dist/index.js",
