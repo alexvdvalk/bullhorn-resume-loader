@@ -2,6 +2,11 @@
 
 Bullhorn Resume Loader is a command-line tool that allows you to load resumes and create candidate records in Bullhorn. This tool parses resumes from a specified folder and uploads the parsed data to Bullhorn, creating candidate records.
 
+## Warning
+
+This tool is currently in the testing phase. Use it at your own risk.
+Please provide any feedback or PRs.
+
 This command will:
 
 1. Log in to the Bullhorn API using the provided username and password.
