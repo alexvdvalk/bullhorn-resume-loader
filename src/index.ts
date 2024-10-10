@@ -3,29 +3,56 @@
 import { Command } from 'commander';
 import fs from 'fs/promises';
 import path from 'path';
-import { type AxiosInstance } from 'axios';
-import FormData from 'form-data';
+// import { type AxiosInstance } from 'axios';
 import { login } from './bullhorn_auth';
-import { createObjectCsvWriter, createArrayCsvWriter } from 'csv-writer';
-import type { ParsedCandidate, CandidateEducation, CandidateWorkHistory } from './interfaces';
+// import { createObjectCsvWriter, createArrayCsvWriter } from 'csv-writer';
+// import type { ParsedCandidate } from './interfaces';
 import figlet from "figlet";
+import inquirer from 'inquirer';
+import chalk from 'chalk';
+import BullhornAPI from './BullhornAPI';
+import { Dirent } from 'fs';
 
 
-// import Bottleneck from "bottleneck";
 
-// const limiter = new Bottleneck({
-//     maxConcurrent: 5,
-// });
+import Bottleneck from "bottleneck";
+
+const limiter = new Bottleneck({
+    maxConcurrent: 5,
+});
 const program = new Command();
 
-// ANSI escape code for pink color
-const pink = '\x1b[95m';
-const reset = '\x1b[0m';
+process.on('SIGTERM', () => {
+    console.log(chalk.yellow('\nSIGTERM received. Starting shutdown procedure...'));
+    shutdownProcedure();
+})
 
-// Custom console.log function that prints in pink
-const pinkLog = (...args: any[]) => {
-    console.log(pink, ...args, reset);
-};
+process.on('SIGINT', () => {
+    console.log(chalk.yellow('\nCtrl+C detected. Starting shutdown procedure...'));
+    shutdownProcedure();
+})
+
+const shutdownProcedure = () => {
+    console.log(chalk.red('*** Close Signal received ****'));
+    const counts = limiter.counts();
+    // console.log(counts)
+    if (counts.EXECUTING === 0) {
+        console.log(chalk.red('No tasks running, exiting...'));
+        process.exit(0);
+    }
+    console.log(chalk.red('Waiting for all pending tasks...'));
+    limiter.stop({
+        dropWaitingJobs: true,
+    }).then(() => {
+        console.log('All pending tasks have been stopped.');
+    }).catch((error) => {
+        console.error('Error stopping tasks:', error);
+    })
+        .finally(() => {
+            console.log(chalk.green('Shutdown procedure complete. Exiting...'));
+            process.exit(0);
+        })
+}
 console.log(figlet.textSync("Resume Loader"));
 
 // Allowed file extensions
@@ -40,184 +67,133 @@ LinkedIn: https://www.linkedin.com/in/alexvdvalk/`)
 
 program.command('load')
     .description('Parse and create candidates for all the resumes in a folder')
-    .requiredOption('-u, --username <username>', 'Bullhorn API username')
-    .requiredOption('-p, --password <password>', 'Bullhorn API password')
-    .requiredOption('-r, --resumeFolder <resumeFolder>', 'Folder containing resumes')
-    .action(async (options) => {
-        const { username, password, resumeFolder } = options;
+    // .option('-u, --username <username>', 'Bullhorn API username')
+    // .option('-p, --password <password>', 'Bullhorn API password')
+    .action(async () => {
+        // let { username, password } = options;
 
+
+        await login()
+
+        const resumeFolder = await getResumeFolder()
+
+        const files = await getResumeList(resumeFolder)
+        if (!files) {
+            console.log(chalk.red("No compatible files found in the specified folder", resumeFolder))
+            return
+        }
+        console.log(chalk.blue(`Found ${files.length} compatible file${files.length > 1 ? "s" : ""}`))
+
+        let response
         try {
-            const api = await login(username, password);
-            const files = await fs.readdir(resumeFolder, { withFileTypes: true });
-
-            for (const file of files) {
-                if (!file.isFile()) continue; // Skip if not a file
-
-                const fileExtension = path.extname(file.name).toLowerCase();
-                if (!allowedExtensions.includes(fileExtension)) {
-                    pinkLog(`Skipping file ${file.name}: not a supported file type`);
-                    continue; // Skip if not an allowed file type
-                }
-
-                const filePath = path.join(resumeFolder, file.name);
-                try {
-                    const resumeData = await fs.readFile(filePath);
-                    const parsedResume = await parseResume(resumeData, file.name, api);
-                    // Write parsedResume to a JSON file
-                    const jsonFileName = `${path.parse(file.name).name}.json`;
-                    const jsonFilePath = path.join(resumeFolder, 'JSON', jsonFileName);
-                    await fs.mkdir(path.dirname(jsonFilePath), { recursive: true });
-                    await fs.writeFile(jsonFilePath, JSON.stringify(parsedResume, null, 2));
-                    pinkLog(`Wrote parsed resume to ${jsonFilePath}`);
-
-                    await loadCandidateToBullhorn(parsedResume, resumeData, file.name, api)
-                    // Write data to CSV file
-
-                    pinkLog(`Processed and created candidate for: ${file.name}`);
-                    await moveFile(filePath, path.join(resumeFolder, 'processed'));
-                } catch (error) {
-                    console.error(pink, `Error processing file ${file.name}:`, error, reset);
-                    await moveFile(filePath, path.join(resumeFolder, 'failed'));
-                }
-            }
-
-            pinkLog('All resumes processed');
+            response = await inquirer.prompt([{
+                type: 'confirm',
+                name: 'skipDuplicates',
+                message: 'Do you want to skip duplicates?',
+                default: true
+            }, {
+                type: 'confirm',
+                name: 'skipNoemail',
+                message: 'Do you want to skip candidates with no email?',
+                default: true
+            },
+            {
+                type: 'input',
+                name: 'preocessedFileList',
+                message: 'Enter the folder for processed files',
+                default: './processed',
+                validate: (input) => input.length > 0
+            },
+            {
+                type: 'number',
+                name: 'maxConcurrent',
+                message: 'Enter the maximum number of concurrent requests. This will set the number of files to be processed at a time',
+                default: 5,
+                validate: (input) => input! > 0
+            }])
         } catch (error) {
-            console.error(pink, 'Error processing resumes:', error, reset);
+            if (error instanceof Error && error.name === 'ExitPromptError') {
+                console.log(chalk.yellow('cancelled.'));
+                process.exit(0);
+            }
+            throw error;
+        }
+        const { skipDuplicates, skipNoemail, preocessedFileList, maxConcurrent } = response
+
+
+
+        limiter.updateSettings({ maxConcurrent })
+        // try {
+        if (!files) {
+            console.log(chalk.red('No compatible files found in the specified folder', resumeFolder))
+            process.exit(0)
+        };
+        for (const file of files) {
+
+
+            const filePath = path.join(resumeFolder, file.name);
+            const resumeData = await fs.readFile(filePath);
+
+            limiter.schedule(() => BullhornAPI.createCandidate(resumeData, file.name, skipDuplicates, skipNoemail)
+                .then(newCand => {
+                    console.log(chalk.green(`Candidate created with ID: ${newCand.changedEntityId}`))
+                    return moveFile(filePath, preocessedFileList)
+                }).catch(err => {
+                    console.error(chalk.red(err))
+                })
+            ).catch(() => {
+                // console.error(chalk.red(err))
+            })
         }
     });
 
 
-// program.command('extract-to-json')
-//     .description('This command uses the Bullhorn API to parse resumes into JSON format. These files can then be loaded into Bullhorn using the load-from-json command')
-//     .requiredOption('-u, --username <username>', 'Bullhorn API username')
-//     .requiredOption('-p, --password <password>', 'Bullhorn API password')
-//     .requiredOption('-r, --resumeFolder <resumeFolder>', 'Folder containing resumes')
-//     .action(async (options) => {
-//         const { username, password, resumeFolder } = options;
-
-//         try {
-//             const api = await login(username, password);
-//             const files = await fs.readdir(resumeFolder, { withFileTypes: true });
-
-//             for (const file of files) {
-//                 if (!file.isFile()) continue; // Skip if not a file
-
-//                 const fileExtension = path.extname(file.name).toLowerCase();
-//                 if (!allowedExtensions.includes(fileExtension)) {
-//                     pinkLog(`Skipping file ${file.name}: not a supported file type`);
-//                     continue; // Skip if not an allowed file type
-//                 }
-
-//                 const filePath = path.join(resumeFolder, file.name);
-//                 try {
-//                     const resumeData = await fs.readFile(filePath);
-//                     const parsedResume = await parseResume(resumeData, file.name, api);
-
-//                     // Write parsedResume to a JSON file
-//                     const jsonFileName = `${path.parse(file.name).name}.json`;
-//                     const jsonFilePath = path.join(resumeFolder, 'JSON', jsonFileName);
-//                     await fs.mkdir(path.dirname(jsonFilePath), { recursive: true });
-//                     await fs.writeFile(jsonFilePath, JSON.stringify(parsedResume, null, 2));
-//                     pinkLog(`Wrote parsed resume to ${jsonFilePath}`);
-
-//                     // Write data to CSV file
-//                     await writeToCsv(file.name, jsonFileName, parsedResume);
-
-//                     pinkLog(`Processed and created candidate for: ${file.name}`);
-//                     await moveFile(filePath, path.join(resumeFolder, 'processed'));
-//                 } catch (error) {
-//                     console.error(pink, `Error processing file ${file.name}:`, error, reset);
-//                     await moveFile(filePath, path.join(resumeFolder, 'failed'));
-//                 }
-//             }
-
-//             pinkLog('All resumes processed');
-//         } catch (error) {
-//             console.error(pink, 'Error processing resumes:', error, reset);
-//         }
-//     });
-
-const loadCandidateToBullhorn = async (candidate: ParsedCandidate, resumeData: Buffer, fileName: string, api: AxiosInstance) => {
-
-    const cleanedPayload = { ...candidate.candidate as { [key: string]: any } }
-    delete cleanedPayload.editHistoryValue;
-    delete cleanedPayload.onboardingReceivedSent;
-    cleanedPayload.skillSet = candidate.skillList
-    const { data } = await api.put('/entity/Candidate', cleanedPayload);
-    const candidateId = data.changedEntityId
-    await addEducationHistories(candidateId, candidate.candidateEducation, api)
-    await addWorkHistories(candidateId, candidate.candidateWorkHistory, api)
-    await uploadResumeFiletoCandidate(candidateId, resumeData, fileName, api)
-}
-
-const uploadResumeFiletoCandidate = async (id: string, resumeData: Buffer, fileName: string, api: AxiosInstance) => {
-    const form = new FormData();
-    form.append('file', resumeData, fileName);
-    form.append('name', fileName);
-    form.append('distribution', 'General');
-
-    const headers = form.getHeaders();
+const getResumeFolder = async () => {
+    let resumeFolder
     try {
-        await api.put(`/file/Candidate/${id}/raw`, form, { params: { externalID: -1, fileType: "SAMPLE" }, headers })
-    } catch (err) {
-        pinkLog("Error uploading file", err)
+
+        const response = await inquirer.prompt([{
+            type: 'input',
+            name: 'resumeFolder',
+            message: 'Enter the folder containing the resumes',
+            validate: (input) => input.length > 0
+        }])
+        resumeFolder = response.resumeFolder
+    } catch (error) {
+        if (error instanceof Error && error.name === 'ExitPromptError') {
+            console.log(chalk.yellow('\nCancelled.'));
+            process.exit(0);
+        }
+    }
+
+    try {
+        const folderExists = await fs.access(resumeFolder)
+            .then(() => true)
+            .catch(() => false);
+
+        if (!folderExists) {
+            console.error(chalk.red(`The specified resume folder does not exist: ${resumeFolder} `));
+            throw new Error('Resume folder not found');
+        }
+
+        console.log(chalk.green(`Resume folder found: ${resumeFolder} `));
+        return resumeFolder;
+    } catch {
+        console.error(chalk.red(`Error reading resume folder. Specify the folder in relation to the current working directory`))
+        return await getResumeFolder()
     }
 
 }
-const addWorkHistories = async (id: string, workHistory: CandidateWorkHistory[], api: AxiosInstance) => {
-    for await (const wh of workHistory) {
-        try {
-
-            const { data } = await api.put('/entity/CandidateWorkHistory', {
-                candidate: {
-                    id
-                },
-                ...wh
+const getResumeList = async (resumeFolder: string) => {
+    try {
+        const files: Dirent[] = await fs.readdir(resumeFolder, { withFileTypes: true })
+        return files
+            .filter(file => {
+                return file.isFile() && allowedExtensions.includes(path.extname(file.name).toLowerCase())
             })
-            pinkLog(`added work history ${data.changedEntityId} for candidate ${id}`)
-        } catch (err) {
-            pinkLog(`Error adding work history`, err)
-        }
+    } catch {
+        console.error(chalk.red(`Error reading resume folder.Specify the folder in relation to the current working directory`))
     }
-}
-
-const addEducationHistories = async (id: string, educationHistory: CandidateEducation[], api: AxiosInstance) => {
-    for await (const ed of educationHistory) {
-        try {
-            const { data } = await api.put('/entity/CandidateEducation', {
-                candidate: {
-                    id
-                },
-                ...ed
-            })
-            pinkLog(`added education history ${data.changedEntityId} for candidate ${id}`)
-        } catch (err) {
-            pinkLog(`Error adding education history`, err)
-        }
-    }
-}
-
-async function parseResume(resumeData: Buffer, fileName: string, api: AxiosInstance) {
-    const form = new FormData();
-    form.append('file', resumeData, fileName);
-
-    const headers = form.getHeaders();
-
-    const parseResponse = await api.post<ParsedCandidate>(
-        'resume/parseToCandidate',
-        form,
-        {
-            headers: {
-                ...headers,
-            },
-            params: {
-                format: "text",
-                populateDescription: "html"
-            }
-        }
-    );
-    return parseResponse.data;
 }
 
 async function moveFile(filePath: string, destinationFolder: string) {
@@ -229,59 +205,59 @@ async function moveFile(filePath: string, destinationFolder: string) {
 
     // Move the file
     await fs.rename(filePath, destinationPath);
-    pinkLog(`Moved ${fileName} to ${destinationFolder} folder`);
+    console.log(chalk.green(`Moved ${fileName} to ${destinationFolder} folder`));
 }
 
-async function writeToCsv(sourceFileName: string, jsonFileName: string, parsedResume: any) {
-    const date = new Date().toISOString().split('T')[0]; // Get the current date in YYYY-MM-DD format
-    const csvFilePath = `candidates_${date}.csv`;
+// async function writeToCsv(sourceFileName: string, jsonFileName: string, parsedResume: any) {
+//     const date = new Date().toISOString().split('T')[0]; // Get the current date in YYYY-MM-DD format
+//     const csvFilePath = `candidates_${date}.csv`;
 
-    // Check if the CSV file exists
-    const fileExists = await fs.access(csvFilePath).then(() => true).catch(() => false);
-    const candidate = parsedResume.candidate;
-    const candidateFields = {
-        "name": candidate.name,
-        "occupation": candidate.occupation,
-        "companyName": candidate.companyName,
-        "mobile": candidate.mobile,
-        "firstName": candidate.firstName,
-        "lastName": candidate.lastName,
-        "email": candidate.email,
-        "confidenceScore": parsedResume.confidenceScore,
-    }
-    // Create the CSV writer
-    const csvWriter = createObjectCsvWriter({
-        path: csvFilePath,
-        header: [
-            { id: 'sourceFileName', title: 'Source File' },
-            { id: 'jsonFileName', title: 'JSON File' },
-            ...Object.keys(candidateFields).map(key => ({ id: key, title: key }))
-        ],
-        append: true
-    });
+//     // Check if the CSV file exists
+//     const fileExists = await fs.access(csvFilePath).then(() => true).catch(() => false);
+//     const candidate = parsedResume.candidate;
+//     const candidateFields = {
+//         "name": candidate.name,
+//         "occupation": candidate.occupation,
+//         "companyName": candidate.companyName,
+//         "mobile": candidate.mobile,
+//         "firstName": candidate.firstName,
+//         "lastName": candidate.lastName,
+//         "email": candidate.email,
+//         "confidenceScore": parsedResume.confidenceScore,
+//     }
+//     // Create the CSV writer
+//     const csvWriter = createObjectCsvWriter({
+//         path: csvFilePath,
+//         header: [
+//             { id: 'sourceFileName', title: 'Source File' },
+//             { id: 'jsonFileName', title: 'JSON File' },
+//             ...Object.keys(candidateFields).map(key => ({ id: key, title: key }))
+//         ],
+//         append: true
+//     });
 
-    // If the file doesn't exist, write the header
-    if (!fileExists) {
-        const headerWriter = createArrayCsvWriter({
-            path: csvFilePath,
-            header: [
-                'Source File',
-                'JSON File',
-                ...Object.keys(candidateFields)
-            ]
-        });
-        await headerWriter.writeRecords([[]]); // Write the header
-    }
+//     // If the file doesn't exist, write the header
+//     if (!fileExists) {
+//         const headerWriter = createArrayCsvWriter({
+//             path: csvFilePath,
+//             header: [
+//                 'Source File',
+//                 'JSON File',
+//                 ...Object.keys(candidateFields)
+//             ]
+//         });
+//         await headerWriter.writeRecords([[]]); // Write the header
+//     }
 
-    // Write the record
-    const record = {
-        sourceFileName,
-        jsonFileName,
-        ...candidateFields
-    };
+//     // Write the record
+//     const record = {
+//         sourceFileName,
+//         jsonFileName,
+//         ...candidateFields
+//     };
 
-    await csvWriter.writeRecords([record]);
-    pinkLog(`Appended data to ${csvFilePath}`);
-}
+//     await csvWriter.writeRecords([record]);
+//     pinkLog(`Appended data to ${csvFilePath} `);
+// }
 
 program.parse();

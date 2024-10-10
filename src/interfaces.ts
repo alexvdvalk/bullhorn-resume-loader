@@ -106,3 +106,19 @@ export interface TokenResponse {
     restUrl: string;
     time?: string
 }
+export interface DuplicateCandidateResponse {
+    _id: number;
+    _label: string;
+    _entityType: string;
+}
+
+export interface CreateCandidateResponse {
+    changedEntityType: string;
+    changedEntityId: number;
+    changeType: string;
+    data: {
+        [key: string]: unknown
+    }
+};
+
+
