@@ -4,13 +4,12 @@ import { Command } from 'commander';
 import fs from 'fs/promises';
 import path from 'path';
 // import { type AxiosInstance } from 'axios';
-import { login } from './bullhorn_auth';
+import { login } from './bullhorn_auth.js';
 // import { createObjectCsvWriter, createArrayCsvWriter } from 'csv-writer';
-// import type { ParsedCandidate } from './interfaces';
-// import figlet from "figlet";
+import figlet from "figlet";
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import BullhornAPI from './BullhornAPI';
+import BullhornAPI from './BullhornAPI.js';
 import { Dirent } from 'fs';
 
 
@@ -53,7 +52,7 @@ const shutdownProcedure = () => {
             process.exit(0);
         })
 }
-// console.log(figlet.textSync("Resume Loader"));
+console.log(figlet.textSync("Resume Loader"));
 
 // Allowed file extensions
 const allowedExtensions = ['.txt', '.doc', '.docx', '.pdf'];

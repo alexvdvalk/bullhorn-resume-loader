@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { type LoginResponse } from "./interfaces"
+import { type LoginResponse } from "./interfaces.js"
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import BullhornAPI from './BullhornAPI';
+import BullhornAPI from './BullhornAPI.js';
 import ora from 'ora';
 
 export const login = async () => {

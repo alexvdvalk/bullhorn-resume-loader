@@ -2,7 +2,7 @@ import Bottleneck from 'bottleneck';
 import axios, { AxiosRequestConfig } from 'axios';
 import chalk from 'chalk';
 import FormData from 'form-data';
-import type { CandidateEducation, CandidateWorkHistory, CreateCandidateResponse, DuplicateCandidateResponse, ParsedCandidate } from './interfaces';
+import type { CandidateEducation, CandidateWorkHistory, CreateCandidateResponse, DuplicateCandidateResponse, ParsedCandidate } from './interfaces.js';
 
 
 
