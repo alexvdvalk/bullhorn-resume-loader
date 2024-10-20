@@ -7,7 +7,7 @@ import path from 'path';
 import { login } from './bullhorn_auth';
 // import { createObjectCsvWriter, createArrayCsvWriter } from 'csv-writer';
 // import type { ParsedCandidate } from './interfaces';
-import figlet from "figlet";
+// import figlet from "figlet";
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import BullhornAPI from './BullhornAPI';
@@ -53,7 +53,7 @@ const shutdownProcedure = () => {
             process.exit(0);
         })
 }
-console.log(figlet.textSync("Resume Loader"));
+// console.log(figlet.textSync("Resume Loader"));
 
 // Allowed file extensions
 const allowedExtensions = ['.txt', '.doc', '.docx', '.pdf'];
