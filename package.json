@@ -12,7 +12,8 @@
     "build": "rm -rf dist & tsc",
     "start": "node dist/index.js",
     "version": "npm version patch && npm publish",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "build-binaries": "bun build --compile --target=bun-darwin-x64 ./src/index.ts  --outfile ./bin/Bullhorn-Resume-Loader-Mac-64 && bun build --compile --target=bun-windows-x64 ./src/index.ts  --outfile ./bin/Bullhorn-Resume-Loader-Windows-64 && bun build --compile --target=bun-darwin-arm64 ./src/index.ts  --outfile ./bin/Bullhorn-Resume-Loader-Mac-ARM"
   },
   "bin": {
     "bullhorn-resume-loader": "./dist/index.js"
@@ -32,6 +33,7 @@
   "dependencies": {
     "axios": "^1.7.7",
     "bottleneck": "^2.19.5",
+    "bun": "^1.1.36",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "csv-writer": "^1.6.0",
